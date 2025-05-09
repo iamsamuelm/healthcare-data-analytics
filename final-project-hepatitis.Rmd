@@ -28,7 +28,7 @@ head(hepatitis_df)
 
 ```
 
-# Data Preprocessing
+# 1. Data Preprocessing
 
 a. Handle missing values appropriately
 
@@ -51,7 +51,7 @@ hepatitis_df[binary_columns] <- lapply(hepatitis_df[binary_columns], impute_mode
 mean_to_impute <- c("Bilirubin", "Alk Phosphate", "Sgot")
 median_to_impute <- c("Albumin", "Protime")
 
-# Helper funciton to impute missing values with the mean or median
+# Helper function to impute missing values with the mean or median
 impute_with <- function(data, columns, method = "mean") {
   for (col in columns) { # Fix: Added parentheses around "col in columns"
     if (method == "mean") {
@@ -77,6 +77,47 @@ head(hepatitis_df)
 b. Encode categorical variables as needed
 
 ```{r}
+# Columns to re-code (1 = No (except Sex where Sex = Male & Class 1 = Die), 2 = No (except Sex where Sex = Female & Class 2 = Yes))
+to_recode <- c("Sex", "Steroid", "Antivirals", "Fatigue",
+               "Malaise","Anorexia", "Liver Big", "Liver Firm", 
+               "Spleen Palpable", "Spiders", "Ascites", "Varices",
+               "Histology", "Class")
 
+# Function to recode 1's to 1's and 2's to 0's
+recode_binary <- function(column, column_name) {
+  if (column_name == "Sex") {
+    #For Sex: 1 = Male, 2 = Female
+    return(ifelse(column == 2, 0, 1)) # 1 = Male, 0 = Female
+  } else if (column_name == "Class") {
+    # For Class: 1 = Die, 2 = Live
+    return(ifelse(column == 2, 1, 0)) # 1 = Live, 0 = Die
+  } else {
+    # For other columns: 1 = No, 2 = Yes
+    return(ifelse(column == 2, 1, 0)) # 1 = Yes, 0 = No
+  }
+}
+
+# Applying the re-coding function
+for (col in to_recode) {
+  hepatitis_df[[col]] <- recode_binary(hepatitis_df[[col]], col)
+}
+
+# Convert 'Class' to a factor
+hepatitis_df$Class <- factor(hepatitis_df$Class, levels = c(0, 1), labels = c("Die", "Live"))
+```
+
+c. Normalize or standardize features if required
+
+```{r}
+# Checking summary statistics for standardization
+summary(hepatitis_df$Bilirubin)
+summary(hepatitis_df$`Alk Phosphate`)
+summary(hepatitis_df$Sgot)
+summary(hepatitis_df$Protime)
+
+# Standardizing necessary features
+features_to_scale <- c("Bilirubin", "Alk Phosphate", "Sgot", "Protime")
+hepatitis_df[features_to_scale] <- scale(hepatitis_df[features_to_scale])
+summary(hepatitis_df[features_to_scale])
 ```
 
