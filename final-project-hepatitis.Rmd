@@ -11,7 +11,7 @@ output: html_document
 ```{r}
 
 # Required packages
-required_packages <- c("readr", "dplyr", "tidyr") 
+required_packages <- c("readr", "dplyr", "tidyr", "ggplot2", "corrplot", "RColorBrewer") 
 
 new_packages <- required_packages[!required_packages %in% installed.packages()]
 if (length(new_packages) > 0) {
@@ -21,6 +21,9 @@ if (length(new_packages) > 0) {
 library(readr)
 library(dplyr)
 library(tidyr)
+library(ggplot2)
+library(corrplot)
+library(RColorBrewer)
 
 # Read in CSV
 hepatitis_df <- read_csv("hepatitis.csv")
@@ -78,7 +81,7 @@ b. Encode categorical variables as needed
 
 ```{r}
 # Columns to re-code (1 = No (except Sex where Sex = Male & Class 1 = Die), 2 = No (except Sex where Sex = Female & Class 2 = Yes))
-to_recode <- c("Sex", "Steroid", "Antivirals", "Fatigue",
+features_to_recode <- c("Sex", "Steroid", "Antivirals", "Fatigue",
                "Malaise","Anorexia", "Liver Big", "Liver Firm", 
                "Spleen Palpable", "Spiders", "Ascites", "Varices",
                "Histology", "Class")
@@ -119,5 +122,68 @@ summary(hepatitis_df$Protime)
 features_to_scale <- c("Bilirubin", "Alk Phosphate", "Sgot", "Protime")
 hepatitis_df[features_to_scale] <- scale(hepatitis_df[features_to_scale])
 summary(hepatitis_df[features_to_scale])
+```
+
+# 2. Data Visualization
+
+a. Create at least 3 meaningful visualizations to explore data distributions and relationships.
+
+```{r}
+# Setting a colour palette
+palette <- brewer.pal(3, "Set2")
+
+# --- Histograms -- #
+# 1. Histogram for Bilirubin
+ggplot(hepatitis_df, aes(x = Bilirubin)) +
+  geom_histogram(binwidth = 0.5, fill = palette[1], color = "black", alpha = 0.7) + 
+  labs(title = "Histogram of Bilirubin", x = "Bilirubin", y = "Frequency") +
+  theme_classic() + 
+  theme(text = element_text(size= 12))
+
+# 2. Histogram for Alk Phosphate
+ggplot(hepatitis_df, aes(x = `Alk Phosphate`)) +
+  geom_histogram(binwidth = 0.5, fill = palette[2], color = "black", alpha = 0.7) + 
+  labs(title = "Histogram of Alk Phosphate", x = "Alk Phosphate", y = "Frequency") + 
+  theme_classic() + 
+  theme(text = element_text(size= 12))
+
+# 3. Histogram for Sgot
+ggplot(hepatitis_df, aes(x = Sgot)) +
+  geom_histogram(binwidth = 0.5, fill = palette[3], color = "black", alpha = 0.7) + 
+  labs(title = "Histogram of Sgot", x = "Sgot", y = "Frequency") +
+  theme_classic() + theme(text = element_text(size= 12))
+
+# --- Boxplots --- #
+#1. Boxplot for Bilirubin by Class
+ggplot(hepatitis_df, aes(x = factor(Class), y = Bilirubin, fill = factor(Class))) +
+  geom_boxplot() + labs(title = "Boxplot for Bilirubin by Outcome (Class)", x = "Outcome", y = "Bilirubin") + 
+  theme_classic() +
+  scale_fill_manual(values = palette) + 
+  theme(text = element_text(size = 12))
+
+#2. Boxplot for Alk Phosphate by Class
+ggplot(hepatitis_df, aes(x = factor(Class), y = `Alk Phosphate`, fill = factor(Class))) +
+  geom_boxplot() + labs(title = "Boxplot for Alk Phosphate by Outcome (Class)", x = "Outcome", y = "Alk Phosphate") + 
+  theme_classic() +
+  scale_fill_manual(values = palette) + 
+  theme(text = element_text(size = 12))
+
+#3. Boxplot for Sgot by Class,
+ggplot(hepatitis_df, aes(x = factor(Class), y = Sgot, fill = factor(Class))) +
+  geom_boxplot() + labs(title = "Boxplot for Sgot by Outcome (Class)", x = "Outcome", y = "Sgot") + 
+  theme_classic() +
+  scale_fill_manual(values = palette) + 
+  theme(text = element_text(size = 12))
+
+# --- Correlation Heatmap --- #
+hepatitis_df_without_target <- hepatitis_df %>% select(-Class)
+numeric_features <- sapply(hepatitis_df_without_target, is.numeric)
+cor_matrix <- cor(hepatitis_df_without_target[, numeric_features], use = "complete.obs")
+corrplot(cor_matrix, method = "number", type = "upper",
+         tl.col = "black", tl.cex = 0.8, addCoef.col = "black",
+         insig = "blank",
+         sig.level = 0.05,
+         title = "Correlation Heatmap of All Features",
+         mar = c(0, 0, 1, 0), col = rev(brewer.pal(9, "Blues")))
 ```
 
