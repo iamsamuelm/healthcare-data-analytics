@@ -11,7 +11,7 @@ output: html_document
 ```{r}
 
 # Required packages
-required_packages <- c("readr", "dplyr", "tidyr", "ggplot2", "corrplot", "RColorBrewer") 
+required_packages <- c("readr", "dplyr", "tidyr", "ggplot2", "corrplot", "RColorBrewer", "caret", "knn", "e1071") 
 
 new_packages <- required_packages[!required_packages %in% installed.packages()]
 if (length(new_packages) > 0) {
@@ -24,6 +24,9 @@ library(tidyr)
 library(ggplot2)
 library(corrplot)
 library(RColorBrewer)
+library(caret)
+library(kknn)
+library(e1071)
 
 # Read in CSV
 hepatitis_df <- read_csv("hepatitis.csv")
@@ -187,3 +190,75 @@ corrplot(cor_matrix, method = "number", type = "upper",
          mar = c(0, 0, 1, 0), col = rev(brewer.pal(9, "Blues")))
 ```
 
+# 3. Model Building
+
+a. Split the dataset into 75% training and 25% testing sests
+
+```{r}
+#set seed for reproducibility
+set.seed(123)
+
+# Splitting dataset
+training_df <- createDataPartition(hepatitis_df$Class, p = 0.75, list = FALSE)
+train <- hepatitis_df[training_df, ]
+test <- hepatitis_df[-training_df, ]
+
+train$Class <- as.factor(train$Class)
+
+# Cross-validation with 5 folds and configure ROC-based evaluation
+ctrl <- trainControl(method = "cv",
+                     number = 5,
+                     classProbs = TRUE,
+                     summaryFunction = twoClassSummary)
+
+# Removing NA variables in the training dataset
+calculate_mode <- function(x) {
+  unique_x <- unique(na.omit(x))
+  unique_x[which.max(tabulate(match(x, unique_x)))]
+}
+
+for (col in colnames(train)) {
+  if (any(is.na(train[[col]]))) {
+    mode_value <- calculate_mode(train[[col]])
+    train[[col]][is.na(train[[col]])] <- mode_value
+  }
+}
+
+# Checking if there are any missing values
+sum(is.na(train))
+
+# Removing spaces in column names
+colnames(train) <- gsub(" ", "_", colnames(train))
+
+# Fixing Class levels
+levels(train$Class)  # Check current levels
+train$Class <- relevel(train$Class, ref = "Live") 
+
+# Making the data frame type the standard data.frame
+train <- as.data.frame(train)
+
+```
+
+b. Training a Decision Tree, SVM, and KNN
+
+```{r}
+# Decision Tree
+Decision_Tree <- train(Class ~ ., data = train,
+                       method = "rpart",
+                       trControl = ctrl,
+                       metric = "ROC")
+
+# SVM
+SVM <- train(Class ~ ., data = train,
+             method = "svmRadial",
+             trControl = ctrl, 
+             metric = "ROC")
+
+# KNN
+KNN <- train(Class ~ ., data = train,
+                   method = "kknn",
+                   trControl = ctrl,
+                   metric = "ROC")
+```
+
+# 4. Cross-Validation Model Evaluation
