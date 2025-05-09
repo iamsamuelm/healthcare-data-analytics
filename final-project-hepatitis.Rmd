@@ -1,0 +1,82 @@
+---
+title: "Hepatitis Education & Outreach"
+author: Samuel Muma, Adharsh Maheswaran, Chantel Orimoloye, Mikhail Tabong, Omodara
+  Ojebuoboh
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+# Importing dataset
+
+```{r}
+
+# Required packages
+required_packages <- c("readr", "dplyr", "tidyr") 
+
+new_packages <- required_packages[!required_packages %in% installed.packages()]
+if (length(new_packages) > 0) {
+  install.packages(new_packages)
+}
+
+library(readr)
+library(dplyr)
+library(tidyr)
+
+# Read in CSV
+hepatitis_df <- read_csv("hepatitis.csv")
+head(hepatitis_df)
+
+```
+
+# Data Preprocessing
+
+a. Handle missing values appropriately
+
+```{r}
+# Getting the most frequent value (mode) for binary categorical columns
+binary_columns <- c("Steroid", "Liver Big", "Liver Firm", 
+                    "Spleen Palpable", "Spiders", "Ascites", "Varices")
+
+# Helper funciton to impute missing values with the mode
+impute_mode <- function(col) {
+  mode_value <- as.numeric(names(sort(table(col), decreasing = TRUE))[1])
+  col[is.na(col)] <- mode_value
+  return(col)
+}
+
+# Apply imputation
+hepatitis_df[binary_columns] <- lapply(hepatitis_df[binary_columns], impute_mode)
+
+# Handling Nominal columns
+mean_to_impute <- c("Bilirubin", "Alk Phosphate", "Sgot")
+median_to_impute <- c("Albumin", "Protime")
+
+# Helper funciton to impute missing values with the mean or median
+impute_with <- function(data, columns, method = "mean") {
+  for (col in columns) { # Fix: Added parentheses around "col in columns"
+    if (method == "mean") {
+      impute_value <- mean(data[[col]], na.rm = TRUE)
+    } else if (method == "median") {
+      impute_value <- median(data[[col]], na.rm = TRUE) 
+    } else {
+      stop("Invalid method. Please use 'mean' or 'median'.")
+    }
+    # Impute N/A in the specified column
+    data[[col]][is.na(data[[col]])] <- impute_value
+  }
+  return(data)
+}
+
+# Impute using mean & median
+hepatitis_df <- impute_with(hepatitis_df, mean_to_impute, method = "mean")
+hepatitis_df <- impute_with(hepatitis_df, median_to_impute, method = "median")
+head(hepatitis_df)
+
+```
+
+b. Encode categorical variables as needed
+
+```{r}
+
+```
+
