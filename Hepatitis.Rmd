@@ -1,0 +1,386 @@
+---
+title: "Hepatitis Education & Outreach"
+author: Chantel Orimoloye, Mikhail Tabong, Omodara Ojebuoboh
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+# Importing dataset
+```{r}
+# Required packages
+required_packages <- c("readr", "dplyr", "tidyr", "ggplot2", "corrplot", "RColorBrewer", "caret", "kknn", "e1071", "pROC") 
+
+# Set a CRAN mirror before installing packages
+options(repos = c(CRAN = "https://cloud.r-project.org"))
+
+# Now check and install missing packages
+new_packages <- required_packages[!required_packages %in% installed.packages()]
+if (length(new_packages) > 0) {
+  install.packages(new_packages)
+}
+
+# Load the packages
+library(readr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(corrplot)
+library(RColorBrewer)
+library(caret)
+library(kknn)
+library(e1071)
+library(pROC)
+# Read in CSV
+hepatitis_df <- read_csv("hepatitis.csv")
+head(hepatitis_df)
+
+```
+
+# 1. Data Preprocessing
+
+a. Handle missing values appropriately
+
+```{r}
+#A
+# Getting the most frequent value (mode) for binary categorical columns
+binary_columns <- c("Steroid", "Liver Big", "Liver Firm", 
+                    "Spleen Palpable", "Spiders", "Ascites", "Varices")
+
+# Helper function to impute missing values with the mode
+impute_mode <- function(col) {
+  mode_value <- as.numeric(names(sort(table(col), decreasing = TRUE))[1])
+  col[is.na(col)] <- mode_value
+  return(col)
+}
+
+# Apply imputation
+hepatitis_df[binary_columns] <- lapply(hepatitis_df[binary_columns], impute_mode)
+
+# Handling Nominal columns
+mean_to_impute <- c("Bilirubin", "Alk Phosphate", "Sgot")
+median_to_impute <- c("Albumin", "Protime")
+
+# Helper function to impute missing values with the mean or median
+impute_with <- function(data, columns, method = "mean") {
+  for (col in columns) {
+    if (method == "mean") {
+      impute_value <- mean(data[[col]], na.rm = TRUE)
+    } else if (method == "median") {
+      impute_value <- median(data[[col]], na.rm = TRUE) 
+    } else {
+      stop("Invalid method. Please use 'mean' or 'median'.")
+    }
+    # Impute N/A in the specified column
+    data[[col]][is.na(data[[col]])] <- impute_value
+  }
+  return(data)
+}
+
+# Preview the cleaned dataset
+summary(hepatitis_df)
+
+# Impute using mean & median
+hepatitis_df <- impute_with(hepatitis_df, mean_to_impute, method = "mean")
+hepatitis_df <- impute_with(hepatitis_df, median_to_impute, method = "median")
+head(hepatitis_df)
+
+ncol(df)
+nrow(df)
+```
+
+```{r}
+print(ncol(df))
+print(nrow(df))
+```
+
+```
+
+b. Encode categorical variables as needed
+
+```{r}
+
+ # Columns to re-code (1 = No (except Sex where Sex = Male & Class 1 = Die), 2 = No (except Sex where Sex = Female & Class 2 = Yes))
+features_to_recode <- c("Sex", "Steroid", "Antivirals", "Fatigue",
+               "Malaise","Anorexia", "Liver Big", "Liver Firm", 
+               "Spleen Palpable", "Spiders", "Ascites", "Varices",
+               "Histology", "Class")
+
+# Function to recode 1's to 1's and 2's to 0's
+recode_binary <- function(column, column_name) {
+  if (column_name == "Sex") {
+    #For Sex: 1 = Male, 2 = Female
+    return(ifelse(column == 2, 0, 1)) # 1 = Male, 0 = Female
+  } else if (column_name == "Class") {
+    # For Class: 1 = Die, 2 = Live
+    return(ifelse(column == 2, 1, 0)) # 1 = Live, 0 = Die
+  } else {
+    # For other columns: 1 = No, 2 = Yes
+    return(ifelse(column == 2, 1, 0)) # 1 = Yes, 0 = No
+  }
+}
+
+# Applying the re-coding function
+for (col in features_to_recode) {
+  hepatitis_df[[col]] <- recode_binary(hepatitis_df[[col]], col)
+}
+
+# Drop rows with any missing values
+hepatitis_df <- na.omit(hepatitis_df)
+
+
+# Convert 'Class' to a factor
+hepatitis_df$Class <- factor(hepatitis_df$Class, levels = c(0, 1), labels = c("Die", "Live"))
+```
+
+c. Normalize or standardize features if required
+
+```{r}
+##c.
+# Checking summary statistics for standardization
+summary(hepatitis_df$Bilirubin)
+summary(hepatitis_df$`Alk Phosphate`)
+summary(hepatitis_df$Sgot)
+summary(hepatitis_df$Protime)
+
+# Standardizing necessary features
+features_to_scale <- c("Bilirubin", "Alk Phosphate", "Sgot", "Protime")
+hepatitis_df[features_to_scale] <- scale(hepatitis_df[features_to_scale])
+summary(hepatitis_df[features_to_scale])
+
+```
+
+# 2. Data Visualization
+
+a. Create at least 3 meaningful visualizations to explore data distributions and relationships.
+
+```{r}
+# Setting a colour palette
+palette <- brewer.pal(3, "Set2")
+
+# --- Histograms -- #
+# 1. Histogram for Bilirubin
+ggplot(hepatitis_df, aes(x = Bilirubin)) +
+  geom_histogram(binwidth = 0.5, fill = palette[1], color = "black", alpha = 0.7) + 
+  labs(title = "Histogram of Bilirubin", x = "Bilirubin", y = "Frequency") +
+  theme_classic() + 
+  theme(text = element_text(size= 12))
+
+# 2. Histogram for Alk Phosphate
+ggplot(hepatitis_df, aes(x = `Alk Phosphate`)) +
+  geom_histogram(binwidth = 0.5, fill = palette[2], color = "black", alpha = 0.7) + 
+  labs(title = "Histogram of Alk Phosphate", x = "Alk Phosphate", y = "Frequency") + 
+  theme_classic() + 
+  theme(text = element_text(size= 12))
+
+# 3. Histogram for Sgot
+ggplot(hepatitis_df, aes(x = Sgot)) +
+  geom_histogram(binwidth = 0.5, fill = palette[3], color = "black", alpha = 0.7) + 
+  labs(title = "Histogram of Sgot", x = "Sgot", y = "Frequency") +
+  theme_classic() + theme(text = element_text(size= 12))
+
+# --- Boxplots --- #
+#1. Boxplot for Bilirubin by Class
+ggplot(hepatitis_df, aes(x = factor(Class), y = Bilirubin, fill = factor(Class))) +
+  geom_boxplot() + labs(title = "Boxplot for Bilirubin by Outcome (Class)", x = "Outcome", y = "Bilirubin") + 
+  theme_classic() +
+  scale_fill_manual(values = palette) + 
+  theme(text = element_text(size = 12))
+
+#2. Boxplot for Alk Phosphate by Class
+ggplot(hepatitis_df, aes(x = factor(Class), y = `Alk Phosphate`, fill = factor(Class))) +
+  geom_boxplot() + labs(title = "Boxplot for Alk Phosphate by Outcome (Class)", x = "Outcome", y = "Alk Phosphate") + 
+  theme_classic() +
+  scale_fill_manual(values = palette) + 
+  theme(text = element_text(size = 12))
+
+#3. Boxplot for Sgot by Class
+ggplot(hepatitis_df, aes(x = factor(Class), y = Sgot, fill = factor(Class))) +
+  geom_boxplot() + labs(title = "Boxplot for Sgot by Outcome (Class)", x = "Outcome", y = "Sgot") + 
+  theme_classic() +
+  scale_fill_manual(values = palette) + 
+  theme(text = element_text(size = 12))
+
+# --- Correlation Heatmap --- #
+hepatitis_df_without_target <- hepatitis_df %>% select(-Class)
+numeric_features <- sapply(hepatitis_df_without_target, is.numeric)
+cor_matrix <- cor(hepatitis_df_without_target[, numeric_features], use = "complete.obs")
+corrplot(cor_matrix, method = "number", type = "upper", 
+         tl.col = "black", tl.cex = 0.8, addCoef.col = "black",
+         insig = "blank",
+         sig.level = 0.05,
+         title = "Correlation Heatmap of All Features",
+         mar = c(0, 0, 1, 0), col = rev(brewer.pal(9, "Blues")))
+```
+
+
+# 3. Model Building
+
+a. Split the dataset into 75% training and 25% testing sests
+
+```{r}
+#set seed for reproducibility
+set.seed(123)
+
+# Splitting dataset
+training_df <- createDataPartition(hepatitis_df$Class, p = 0.75, list = FALSE)
+train <- hepatitis_df[training_df, ]
+test <- hepatitis_df[-training_df, ]
+train$Class <- as.factor(train$Class)
+
+# Cross-validation with 5 folds and configure ROC-based evaluation
+ctrl <- trainControl(method = "cv",
+                     number = 5,
+                     classProbs = TRUE,
+                     summaryFunction = twoClassSummary)
+
+# Removing NA variables in the training dataset
+calculate_mode <- function(x) {
+  unique_x <- unique(na.omit(x))
+  unique_x[which.max(tabulate(match(x, unique_x)))]
+}
+
+for (col in colnames(train)) {
+  if (any(is.na(train[[col]]))) {
+    mode_value <- calculate_mode(train[[col]])
+    train[[col]][is.na(train[[col]])] <- mode_value
+  }
+}
+
+# Checking if there are any missing values
+sum(is.na(train))
+
+# Removing spaces in column names
+colnames(train) <- gsub(" ", "_", colnames(train))
+
+# Fixing Class levels
+levels(train$Class)  # Check current levels
+train$Class <- relevel(train$Class, ref = "Live") 
+
+# Making the data frame type the standard data.frame
+train <- as.data.frame(train)
+
+```
+
+b. Training a Decision Tree, SVM, and KNN
+
+```{r}
+# Ensure no missing values in train data before model training
+train <- na.omit(train)
+
+# Confirm no NAs remain
+print(paste("Remaining NAs in train:", sum(is.na(train))))
+
+# Decision Tree
+Decision_Tree <- train(Class ~ ., data = train,
+                       method = "rpart",
+                       trControl = ctrl,
+                       metric = "ROC")
+
+# SVM
+SVM <- train(Class ~ ., data = train,
+             method = "svmRadial",
+             trControl = ctrl, 
+             metric = "ROC")
+
+# KNN
+KNN <- train(Class ~ ., data = train,
+             method = "kknn",
+             trControl = ctrl,
+             metric = "ROC")
+
+# Print model results
+print(Decision_Tree)
+print(SVM)
+print(KNN)
+
+# Compare models
+results <- resamples(list(DecisionTree = Decision_Tree, 
+                          SVM = SVM, 
+                          KNN = KNN))
+summary(results)
+bwplot(results)
+
+# Fix column names in test set to match train
+colnames(test) <- gsub(" ", "_", colnames(test))
+
+# Ensure test$Class is a factor with the same levels as train$Class
+test$Class <- factor(test$Class, levels = levels(train$Class))
+
+# Predictions on test set
+dt_pred <- predict(Decision_Tree, newdata = test, type = "prob")
+svm_pred <- predict(SVM, newdata = test, type = "prob")
+knn_pred <- predict(KNN, newdata = test, type = "prob")
+
+# Calculate ROC AUC
+dt_roc <- roc(test$Class, dt_pred[,"Live"])
+svm_roc <- roc(test$Class, svm_pred[,"Live"])
+knn_roc <- roc(test$Class, knn_pred[,"Live"])
+
+# Print results
+cat("Decision Tree Test ROC AUC:", auc(dt_roc), "\n")
+cat("SVM Test ROC AUC:", auc(svm_roc), "\n")
+cat("KNN Test ROC AUC:", auc(knn_roc), "\n")
+
+# Plot ROC curves
+plot(dt_roc, col = "blue", main = "ROC Curves for Hepatitis Models")
+plot(svm_roc, col = "red", add = TRUE)
+plot(knn_roc, col = "green", add = TRUE)
+legend("bottomright", legend = c("Decision Tree", "SVM", "KNN"), 
+       col = c("blue", "red", "green"), lwd = 2)
+
+```
+
+# 4. Cross-Validation Model Evaluation
+```{r}
+resamps <- resamples(list(DecisionTree = Decision_Tree, SVM = SVM, KNN = KNN))
+summary(resamps)
+bwplot(resamps, metric = "ROC")
+```
+```{r}
+### 5. Fairness and Bias Evaluation
+
+```{r}
+library(dplyr)
+train_results <- train %>%
+  mutate(pred = predict(Decision_Tree, newdata = train)) %>%
+  group_by(Sex) %>%
+  summarise(Accuracy = mean(pred == Class))
+train_results
+```
+
+### 6. Test Set Model Evaluation
+
+```{r}
+# Predictions
+dt_preds <- predict(Decision_Tree, newdata = test)
+svm_preds <- predict(SVM, newdata = test)
+knn_preds <- predict(KNN, newdata = test)
+
+# Confusion Matrices
+dt_cm <- confusionMatrix(dt_preds, test$Class)
+svm_cm <- confusionMatrix(svm_preds, test$Class)
+knn_cm <- confusionMatrix(knn_preds, test$Class)
+
+dt_cm
+svm_cm
+knn_cm
+```
+
+```{r}
+
+### 7. Model Comparison Visualization
+
+```{r}
+model_names <- c("Decision Tree", "SVM", "KNN")
+accuracies <- c(dt_cm$overall["Accuracy"], svm_cm$overall["Accuracy"], knn_cm$overall["Accuracy"])
+comparison_df <- data.frame(Model = model_names, Accuracy = accuracies)
+
+ggplot(comparison_df, aes(x = Model, y = Accuracy, fill = Model)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Test Set Model Performance (Accuracy)") +
+  theme_minimal()
+```
+```
+
+
+
