@@ -30,10 +30,10 @@ library(caret)
 library(kknn)
 library(e1071)
 library(pROC)
+
 # Read in CSV
 hepatitis_df <- read_csv("hepatitis.csv")
 head(hepatitis_df)
-
 ```
 
 # 1. Data Preprocessing
@@ -84,15 +84,8 @@ hepatitis_df <- impute_with(hepatitis_df, mean_to_impute, method = "mean")
 hepatitis_df <- impute_with(hepatitis_df, median_to_impute, method = "median")
 head(hepatitis_df)
 
-ncol(df)
-nrow(df)
-```
-
-```{r}
 print(ncol(df))
 print(nrow(df))
-```
-
 ```
 
 b. Encode categorical variables as needed
@@ -212,7 +205,6 @@ corrplot(cor_matrix, method = "number", type = "upper",
          mar = c(0, 0, 1, 0), col = rev(brewer.pal(9, "Blues")))
 ```
 
-
 # 3. Model Building
 
 a. Split the dataset into 75% training and 25% testing sests
@@ -292,7 +284,18 @@ KNN <- train(Class ~ ., data = train,
 print(Decision_Tree)
 print(SVM)
 print(KNN)
+```
 
+# 4. Cross-Validation Model Evaluation
+
+a. Compare model performance across all 3 models using the following metrics:
+
+* Accuracy
+* Sensitivity (Recall)
+* Specificity
+* ROC/AUC
+
+```{r}
 # Compare models
 results <- resamples(list(DecisionTree = Decision_Tree, 
                           SVM = SVM, 
@@ -328,19 +331,17 @@ plot(knn_roc, col = "green", add = TRUE)
 legend("bottomright", legend = c("Decision Tree", "SVM", "KNN"), 
        col = c("blue", "red", "green"), lwd = 2)
 
-```
-
-# 4. Cross-Validation Model Evaluation
-```{r}
 resamps <- resamples(list(DecisionTree = Decision_Tree, SVM = SVM, KNN = KNN))
 summary(resamps)
 bwplot(resamps, metric = "ROC")
+
 ```
-```{r}
-### 5. Fairness and Bias Evaluation
+
+# 5. Fairness & Bias Evaluation
+
+a. Evaluate your models for potential bias or unfairness across subgroups (e.g., sex, age group, race if available) by choosing at least one demographic variable from your dataset (e.g., gender, age group).
 
 ```{r}
-library(dplyr)
 train_results <- train %>%
   mutate(pred = predict(Decision_Tree, newdata = train)) %>%
   group_by(Sex) %>%
@@ -348,7 +349,14 @@ train_results <- train %>%
 train_results
 ```
 
-### 6. Test Set Model Evaluation
+# 6. Test Set Model Evaluation
+
+a. Compare model performance across all 3 models using the following metrics:
+
+* Accuracy
+* Sensitivity (Recall)
+* Specificity
+* ROC/AUC
 
 ```{r}
 # Predictions
@@ -366,19 +374,20 @@ svm_cm
 knn_cm
 ```
 
-```{r}
-
-### 7. Model Comparison Visualization
+b. Compare differences in performance between the cross-validation and test results.
 
 ```{r}
 model_names <- c("Decision Tree", "SVM", "KNN")
 accuracies <- c(dt_cm$overall["Accuracy"], svm_cm$overall["Accuracy"], knn_cm$overall["Accuracy"])
 comparison_df <- data.frame(Model = model_names, Accuracy = accuracies)
+```
 
+c. Create at least one visualization comparing test set model performances across the 3 models.
+
+```{r}
 ggplot(comparison_df, aes(x = Model, y = Accuracy, fill = Model)) +
   geom_bar(stat = "identity") +
   labs(title = "Test Set Model Performance (Accuracy)") +
-  theme_minimal()
+  theme_classic()
 ```
-
 
