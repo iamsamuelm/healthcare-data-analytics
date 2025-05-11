@@ -1,6 +1,6 @@
 ---
 title: "Hepatitis Education & Outreach"
-author: Chantel Orimoloye, Mikhail Tabong, Omodara Ojebuoboh
+author: Chantel Orimoloye, Samuel Muma, Omodara Ojebuoboh
 date: "`r Sys.Date()`"
 output: html_document
 ---
@@ -380,7 +380,5 @@ ggplot(comparison_df, aes(x = Model, y = Accuracy, fill = Model)) +
   labs(title = "Test Set Model Performance (Accuracy)") +
   theme_minimal()
 ```
-```
-
 
 
