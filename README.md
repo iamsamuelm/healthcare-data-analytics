@@ -1,4 +1,4 @@
-# 🧬 Healthcare Data Analytics – Hepatitis Mortality Prediction
+# 🧬 Hepatitis Education (Hepatitis Detection Using Machine Learning)
 
 Welcome to the **Hepatitis Detection** project! This repo showcases a full machine learning pipeline used to predict mortality outcomes in hepatitis patients using real-world clinical data.
 
